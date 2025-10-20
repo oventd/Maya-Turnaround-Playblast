@@ -1,0 +1,126 @@
+﻿import math
+import maya.api.OpenMaya as om
+import maya.cmds as cmds
+
+INCH_TO_MM = 25.4
+
+def get_camera_dagpath(cam_name):
+    """Return MDagPath to a camera shape from transform or shape name."""
+    sel = om.MSelectionList()
+    sel.add(cam_name)
+    dag = sel.getDagPath(0)
+    # If transform given, extend to shape (camera)
+    if dag.node().hasFn(om.MFn.kTransform):
+        # find first camera shape under transform
+        fn = om.MFnDagNode(dag)
+        for i in range(fn.childCount()):
+            child = fn.child(i)
+            if child.hasFn(om.MFn.kCamera):
+                child_path = om.MDagPath.getAPathTo(child)
+                return child_path
+        raise RuntimeError("No camera shape under transform: {}".format(cam_name))
+    # If shape given, ensure it's a camera
+    if not dag.node().hasFn(om.MFn.kCamera):
+        raise RuntimeError("Node is not a camera: {}".format(cam_name))
+    return dag
+
+def compute_effective_aperture_mm(cam_shape_dag, image_aspect, fit_mode='fill'):
+    """
+    Return (eff_width_mm, eff_height_mm) after applying image aspect.
+    fit_mode:
+      - 'fill'     : crop longer side to fill frame
+      - 'overscan' : expand shorter side (letterbox/pillarbox)
+      - 'horizontal': force horizontal fit (use full aperture width)
+      - 'vertical'  : force vertical fit (use full aperture height)
+    """
+    fn_cam = om.MFnCamera(cam_shape_dag)
+
+    # Maya stores film aperture in inches; convert to mm
+    ap_w_mm = fn_cam.horizontalFilmAperture * INCH_TO_MM
+    ap_h_mm = fn_cam.verticalFilmAperture   * INCH_TO_MM
+    sensor_aspect = ap_w_mm / ap_h_mm
+
+    if fit_mode == 'horizontal':
+        eff_w, eff_h = ap_w_mm, ap_w_mm / image_aspect
+    elif fit_mode == 'vertical':
+        eff_h, eff_w = ap_h_mm, ap_h_mm * image_aspect
+    elif fit_mode == 'overscan':
+        if image_aspect > sensor_aspect:  # image wider ??expand height
+            eff_w, eff_h = ap_w_mm, ap_w_mm / image_aspect
+        else:                              # image taller ??expand width
+            eff_h, eff_w = ap_h_mm, ap_h_mm * image_aspect
+    else:  # 'fill' (default)
+        if image_aspect > sensor_aspect:  # image wider ??crop width
+            eff_h, eff_w = ap_h_mm, ap_h_mm * image_aspect
+        else:                              # image taller ??crop height
+            eff_w, eff_h = ap_w_mm, ap_w_mm / image_aspect
+
+    return eff_w, eff_h
+
+def compute_fov_from_aperture(focal_mm, eff_w_mm, eff_h_mm):
+    """Return (hfov_rad, vfov_rad) from focal length and effective aperture."""
+    hfov = 2.0 * math.atan((eff_w_mm * 0.5) / focal_mm)
+    vfov = 2.0 * math.atan((eff_h_mm * 0.5) / focal_mm)
+    return hfov, vfov
+
+def make_camera_frustum_pyramid(camera, distance=10.0, image_aspect=16.0/9.0, fit_mode='fill', name='camFrustum_PYR'):
+    """
+    Build a pyramid mesh from camera to a plane at 'distance' along camera -Z.
+    - camera: transform or shape name
+    - distance: world units (same as Maya linear unit)
+    - image_aspect: width/height (e.g., 1920/1080)
+    - fit_mode: 'fill' | 'overscan' | 'horizontal' | 'vertical'
+    """
+    cam_shape_dag = get_camera_dagpath(camera)
+    fn_cam = om.MFnCamera(cam_shape_dag)
+
+    focal_mm = fn_cam.focalLength  # mm
+    eff_w_mm, eff_h_mm = compute_effective_aperture_mm(cam_shape_dag, image_aspect, fit_mode)
+    hfov, vfov = compute_fov_from_aperture(focal_mm, eff_w_mm, eff_h_mm)
+
+    # Half extents of the image plane at distance d
+    half_w = distance * math.tan(hfov * 0.5)
+    half_h = distance * math.tan(vfov * 0.5)
+
+    # Camera local-space points (camera looks down -Z in local space)
+    apex_local = om.MPoint(0, 0, 0)
+    p1 = om.MPoint( +half_w, +half_h, -distance)
+    p2 = om.MPoint( -half_w, +half_h, -distance)
+    p3 = om.MPoint( -half_w, -half_h, -distance)
+    p4 = om.MPoint( +half_w, -half_h, -distance)
+
+    # Transform to world space using camera inclusive matrix
+    cam_world = cam_shape_dag.inclusiveMatrix()  # shape path has same world xform as its transform
+    apex = apex_local * cam_world
+    p1w, p2w, p3w, p4w = p1 * cam_world, p2 * cam_world, p3 * cam_world, p4 * cam_world
+
+    # Create mesh: 5 verts, 5 faces (4 sides + base)
+    verts = [(apex.x, apex.y, apex.z),
+             (p1w.x, p1w.y, p1w.z),
+             (p2w.x, p2w.y, p2w.z),
+             (p3w.x, p3w.y, p3w.z),
+             (p4w.x, p4w.y, p4w.z)]
+    faces = [
+        [0, 1, 2],  # side
+        [0, 2, 3],  # side
+        [0, 3, 4],  # side
+        [0, 4, 1],  # side
+        [1, 2, 3, 4],  # base (optional)
+    ]
+
+    mesh = cmds.polyCreateFacet(p=verts, n=name)
+    # polyCreateFacet makes one face; we?셪l rebuild properly:
+    cmds.delete(mesh)
+
+    # Build clean mesh with all faces
+    mesh_name = cmds.polyCreateFacet(p=[verts[i] for i in faces[0]], n=name)[0]
+    for f_idx in range(1, len(faces)):
+        cmds.polyAppend(mesh_name, a=faces[f_idx], ch=False)
+
+    # Lock transforms (optional) and set template/display override if you like
+    return mesh_name, {'half_width': half_w, 'half_height': half_h, 'hfov_deg': math.degrees(hfov), 'vfov_deg': math.degrees(vfov)}
+
+# ---------- Example ----------
+# Select a camera transform (e.g., persp) or pass its name explicitly.
+# mesh, info = make_camera_frustum_pyramid('persp', distance=15.0, image_aspect=1920.0/1080.0, fit_mode='fill', name='perspFrustum')
+# print(info)
