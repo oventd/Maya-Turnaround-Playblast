@@ -1,7 +1,6 @@
 import math
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
-import numpy as np
 
 def get_resolution():
     return cmds.getAttr("defaultResolution.width"), cmds.getAttr("defaultResolution.height")
@@ -52,6 +51,8 @@ def make_camera_frustum_curves(camera_name="camera1",
 
     def _make_closed_curve(points, crv_name):
         pts = [(p.x, p.y, p.z) for p in points] + [(points[0].x, points[0].y, points[0].z)]
+        if cmds.objExists(crv_name):
+            cmds.delete(crv_name)
         return cmds.curve(p=pts, d=1, n=crv_name)
 
     # Create group
@@ -72,4 +73,8 @@ def make_camera_frustum_curves(camera_name="camera1",
         # curve command returns shape parent; ensure we parent the transform
         xform = cmds.listRelatives(crv, p=True, f=False) or [crv]
         cmds.parent(xform[0], grp)
-make_camera_frustum_curves()
+    try:
+        cmds.parent(grp, camera_name)
+    except:
+        pass
+

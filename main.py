@@ -1,6 +1,11 @@
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 import math
+import sys
+import imp
+sys.path.append(r"D:\code\turnaround_distance")
+import view_frustum_crv_generator
+imp.reload(view_frustum_crv_generator)
 
 def get_dagpath_if_exists(name):
     """Return MDagPath if node exists, otherwise None."""
@@ -11,67 +16,56 @@ def get_dagpath_if_exists(name):
     except RuntimeError:
         return None
     
-def _get_camera_shape(cam):
-    """Return camera shape from a transform or shape name, else None."""
-    if not cmds.objExists(cam):
-        return None
-    if cmds.nodeType(cam) == "camera":
-        return cam
-    shapes = cmds.listRelatives(cam, shapes=True, type="camera") or []
-    return shapes[0] if shapes else None
-
-def _get_fov(cam):
-    """Return (h_fov, v_fov) in degrees for the given camera (transform or shape)."""
-    cam_shape = _get_camera_shape(cam)
-    if not cam_shape:
-        return None, None
+def _get_fov(cam_shape):
     h_fov = cmds.camera(cam_shape, q=True, hfv=True)
     v_fov = cmds.camera(cam_shape, q=True, vfv=True)
     return h_fov, v_fov
 
-def main(*args):
+def key_turnaround_camera(camera):
+    if not cmds.objExists(camera):
+        return
+    cam_grp = cmds.group(camera, n="turnaround_camera_grp",r=False)
+
+    for frame, value in [(1,0), (120,360)]:    
+        cmds.setKeyframe(cam_grp, attribute='rotateY',t=frame,v=value)
+        cmds.selectKey(cam_grp, time=(1, 120), attribute="rotateY")
+        cmds.keyTangent(inTangentType="linear", outTangentType="linear")
+
+def place_turnaround_camera(*args):
     camera_name = "camera1"
-    if not cmds.objExists(camera_name):
+    camera_dag = get_dagpath_if_exists(camera_name)
+    if not camera_dag:
         return
 
-    target = "asset"
-    if not cmds.objExists(target):
+    dag = get_dagpath_if_exists("asset")
+    if not dag:
         return
+    
+    fn_dag = om.MFnDagNode(dag)
+    bbox = fn_dag.boundingBox
+    
+    cmds.setAttr(f"{camera_name}.translateY", bbox.center.y)
 
-    # Use world-space bounding box for accurate framing
-    xmin, ymin, zmin, xmax, ymax, zmax = cmds.exactWorldBoundingBox(target)
-    center_x = (xmin + xmax) * 0.5
-    center_y = (ymin + ymax) * 0.5
-    center_z = (zmin + zmax) * 0.5
-
-    half_width = (xmax - xmin) * 0.5
-    half_height = (ymax - ymin) * 0.5
-
-    # Center camera horizontally and vertically on the asset
-    cmds.setAttr(f"{camera_name}.translateX", center_x)
-    cmds.setAttr(f"{camera_name}.translateY", center_y)
-
+    max_bbox_v = bbox.height/2
+    max_bbox_h = 0
+    for size in [bbox.width/2, bbox.depth/2]:
+        if abs(size) > max_bbox_h:
+            max_bbox_h = abs(size)
+    
     h_fov, v_fov = _get_fov(camera_name)
-    if h_fov is None or v_fov is None:
-        return
+    distance = 0
 
-    # Compute distance required to fit both width and height
-    d_h = half_width / math.tan(math.radians(h_fov * 0.5)) if h_fov > 0 else 0
-    d_v = half_height / math.tan(math.radians(v_fov * 0.5)) if v_fov > 0 else 0
-    distance = max(d_h, d_v)
-
-    # Place camera in front of the asset along +Z, assuming default orientation
-    cmds.setAttr(f"{camera_name}.translateZ", center_z + distance)
+    for fov, size, dis  in [(h_fov, max_bbox_h, max_bbox_v), (v_fov, max_bbox_v, max_bbox_h)]:
+        d = size / math.tan(math.radians(fov * 0.5))
+        if d > distance:
+            distance = d+ dis*2 
+    offset = 1.5
+    cmds.setAttr(f"{camera_name}.translateZ", distance*offset)
 
 
-    
-
-
-    
-
-    
-import sys
-sys.path.append(r"D:\code\turnaround_distance")
-import view_frustum_crv_generator
-main()
-view_frustum_crv_generator.make_camera_frustum_curves()
+cam_name = "camera1"
+place_turnaround_camera()
+cam_dist = cmds.getAttr(f"{cam_name}.translateZ")
+view_frustum_crv_generator.make_camera_frustum_curves(far_distance=cam_dist)
+cmds.select(cam_name, r=True)
+# key_turnaround_camera(cam_name)
