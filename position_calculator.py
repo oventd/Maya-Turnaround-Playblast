@@ -49,7 +49,7 @@ def get_turnaround_camera_pos(camera_name="camera1", asset_grp="asset"):
         cmds.warning("Camera not found: {}".format(camera_name))
         return None
 
-    # Find the asset node to frame.
+    # Find the asset node.
     sel = om.MSelectionList()
     sel.add(asset_grp)
     asset_dag = sel.getDagPath(0)
