@@ -56,6 +56,8 @@ class TurnAroundCameraCreator:
 
     def create(self, target, start_frame=1, end_frame=119, padding=1.3):
         """Create and set up the turnaround camera and group."""
+        end_animation = end_frame + 1
+
         # Clean up any existing nodes with the same names
         self.delete()
 
@@ -76,8 +78,8 @@ class TurnAroundCameraCreator:
 
         # Animate rotateY for a full 360 spin
         cmds.setKeyframe(self._group, attribute="rotateY", value=0, time=start_frame)
-        cmds.setKeyframe(self._group, attribute="rotateY", value=360, time=end_frame + 1)
-        cmds.keyTangent(self._group, itt='linear', ott='linear', t=(1, end_frame+1))
+        cmds.setKeyframe(self._group, attribute="rotateY", value=360, time=end_animation)
+        cmds.keyTangent(self._group, itt='linear', ott='linear', t=(1, end_animation))
 
     def delete(self):
         """Delete the created turnaround camera and group if they exist."""
@@ -95,6 +97,7 @@ class TurnAroundCameraCreator:
 
     def update_frame_range(self, start_frame, end_frame):
         """Update the turnaround rotation keys for the group if it exists."""
+        end_animation = end_frame + 1
         if not self._group or not cmds.objExists(self._group):
             return
         try:
@@ -102,8 +105,7 @@ class TurnAroundCameraCreator:
             cmds.cutKey(self._group, attribute="rotateY", clear=True)
             # Re-create linear 360 spin over the new range
             cmds.setKeyframe(self._group, attribute="rotateY", value=0, time=start_frame)
-            cmds.setKeyframe(self._group, attribute="rotateY", value=360, time=end_frame + 1)
-            cmds.selectKey(self._group, time=(start_frame, end_frame), attribute="rotateY")
-            cmds.keyTangent(inTangentType="linear", outTangentType="linear")
+            cmds.setKeyframe(self._group, attribute="rotateY", value=360, time=end_animation)
+            cmds.keyTangent(self._group, itt='linear', ott='linear', t=(1, end_animation))
         except Exception:
             pass
