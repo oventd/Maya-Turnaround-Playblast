@@ -77,8 +77,7 @@ class TurnAroundCameraCreator:
         # Animate rotateY for a full 360 spin
         cmds.setKeyframe(self._group, attribute="rotateY", value=0, time=start_frame)
         cmds.setKeyframe(self._group, attribute="rotateY", value=360, time=end_frame + 1)
-        cmds.selectKey(self._group, time=(start_frame, end_frame), attribute="rotateY")
-        cmds.keyTangent(inTangentType="linear", outTangentType="linear")
+        cmds.keyTangent(self._group, itt='linear', ott='linear', t=(1, end_frame+1))
 
     def delete(self):
         """Delete the created turnaround camera and group if they exist."""
