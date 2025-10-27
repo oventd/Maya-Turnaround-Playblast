@@ -39,7 +39,7 @@ class PlayblastGenerator:
         return self._playblast_options['filename']
 
     @path.setter
-    def set_path(self, path):
+    def path(self, path):
         """Setter kept for compatibility; sets `filename` in options."""
         self._playblast_options['filename'] = path
 
