@@ -37,11 +37,15 @@ class PlayblastGenerator:
     def path(self):
         """Output filepath for the playblast."""
         return self._playblast_options['filename']
+    
+    def _set_path(self, path):
+        """Setter kept for compatibility; sets `filename` in options."""
+        self._playblast_options['filename'] = path
 
     @path.setter
     def path(self, path):
-        """Setter kept for compatibility; sets `filename` in options."""
-        self._playblast_options['filename'] = path
+        """Sets `filename` in options."""
+        self._set_path(path)
 
     @property
     def options(self):
@@ -71,7 +75,7 @@ class PlayblastGenerator:
     def camera(self, camera):
         self._camera = camera
 
-    def set_frame_range(self, first_frame, last_frame):
+    def _set_frame_range(self, first_frame, last_frame):
         """Set frame range, then trigger subclass hook for side-effects."""
         first_frame, last_frame = self._coerce_frame_range(first_frame, last_frame)
         self._playblast_options['startTime'] = first_frame
@@ -87,7 +91,7 @@ class PlayblastGenerator:
     def frame_range(self, value):
         if not isinstance(value, (list, tuple)) or len(value) != 2:
             return
-        self.set_frame_range(value[0], value[1])
+        self._set_frame_range(value[0], value[1])
 
     def _on_frame_range_changed(self, first_frame, last_frame):
         """Hook: after range updates; subclasses sync dependent state here."""
@@ -159,11 +163,10 @@ class PlayblastGenerator:
             path (str | None): Output path override.
             frame_range (tuple[int, int] | None): (first, last) override.
         """
-        if frame_range:
-            self.set_frame_range(frame_range[0], frame_range[1])
-
         if path:
-            self._playblast_options['filename'] = path
+            self._set_path(path)
+        if frame_range:
+            self._set_frame_range(frame_range[0], frame_range[1])
 
         user_camera = self.get_persp_camera()
 
