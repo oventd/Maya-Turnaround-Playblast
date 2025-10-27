@@ -39,8 +39,8 @@ class TurnAroundPlayblastGenerator(PlayblastGenerator):
             end_frame=end_frame,
             padding=self._padding
         )
-        target_cam = self._camera_creator.camera
-        self.set_persp_camera(target_cam)
+        self._camera = self._camera_creator.camera
+        super().pre_process()
         return
 
     def post_process(self):

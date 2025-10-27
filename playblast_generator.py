@@ -3,7 +3,15 @@ import maya.mel as mel
 
 
 class PlayblastGenerator:
-    """Helper class to generate playblasts with configurable options."""
+    """Helper to generate Maya playblasts with configurable options.
+
+    Usage:
+    - Set options via properties or `options` dict.
+    - Optionally override template hooks in subclasses:
+      - `_coerce_frame_range(first, last)` to validate/adjust input range
+      - `_on_frame_range_changed(first, last)` to react to range changes
+    - Call `run(path=..., frame_range=(first, last))`.
+    """
 
     def __init__(self):
         self._playblast_options = {
@@ -23,45 +31,57 @@ class PlayblastGenerator:
             "widthHeight": (1280, 720),  # Output resolution
             "offScreen": True  # Use offscreen viewport
         }
+        self._camera = None
 
     @property
     def path(self):
+        """Output filepath for the playblast."""
         return self._playblast_options['filename']
 
     @path.setter
     def set_path(self, path):
+        """Setter kept for compatibility; sets `filename` in options."""
         self._playblast_options['filename'] = path
 
     @property
     def options(self):
+        """Raw options dict passed to `cmds.playblast` (read)."""
         return self._playblast_options
 
     @options.setter
     def options(self, options):
+        """Replace the options dict entirely (write)."""
         self._playblast_options = options
 
     @property
     def resolution(self):
+        """Return (width, height)."""
         return self._playblast_options['widthHeight']
 
     @resolution.setter
     def resolution(self, width, height):
+        """Set output resolution as (width, height)."""
         self._playblast_options['widthHeight'] = (width, height)
 
-    # Template-style API for frame range
-    def get_frame_range(self):
-        return self._playblast_options['startTime'], self._playblast_options['endTime']
+    @property
+    def camera(self):
+        return self._camera
+    
+    @camera.setter
+    def camera(self, camera):
+        self._camera = camera
 
     def set_frame_range(self, first_frame, last_frame):
+        """Set frame range, then trigger subclass hook for side-effects."""
         first_frame, last_frame = self._coerce_frame_range(first_frame, last_frame)
         self._playblast_options['startTime'] = first_frame
         self._playblast_options['endTime'] = last_frame
         self._on_frame_range_changed(first_frame, last_frame)
 
-    # Property maintained for convenience/backwards-compat
     @property
     def frame_range(self):
-        return self.get_frame_range()
+        """Get or set (first_frame, last_frame)."""
+        return self._playblast_options['startTime'], self._playblast_options['endTime']
 
     @frame_range.setter
     def frame_range(self, value):
@@ -69,13 +89,15 @@ class PlayblastGenerator:
             return
         self.set_frame_range(value[0], value[1])
 
-    # Hooks for subclasses (Template Method pattern)
     def _on_frame_range_changed(self, first_frame, last_frame):
-        """Hook: called after the base updates its frame range options."""
+        """Hook: after range updates; subclasses sync dependent state here."""
         pass
 
     def _coerce_frame_range(self, first_frame, last_frame):
-        """Hook: validate/adjust incoming frame range if needed."""
+        """Hook: validate/adjust incoming frame range if needed.
+
+        Default behavior casts to int and swaps if last < first.
+        """
         try:
             f = int(first_frame)
             l = int(last_frame)
@@ -87,7 +109,7 @@ class PlayblastGenerator:
         return f, l
 
     def get_persp_camera(self):
-        """Return the camera currently used by the persp panel."""
+        """Return camera used by the perspective model panel (modelPanel4)."""
         try:
             camera = cmds.modelPanel('modelPanel4', query=True, camera=True)
             return camera
@@ -96,9 +118,10 @@ class PlayblastGenerator:
             return None
 
     def set_persp_camera(self, camera):
-        """Assign the given camera name to the persp panel.
+        """Assign the given camera name to the perspective panel.
 
-        camera: str
+        Args:
+            camera (str): Camera transform to look through.
         """
         try:
             mel.eval('setNamedPanelLayout "Single Perspective View"')
@@ -108,9 +131,12 @@ class PlayblastGenerator:
             return
 
     def pre_process(self):
-        pass
+        """Prepare scene"""
+        if self.camera:
+            self.set_persp_camera(self._camera)
 
     def post_process(self):
+        """Cleanup after playblast"""
         pass
 
     def playblast(self):
@@ -126,24 +152,23 @@ class PlayblastGenerator:
 
         print(f'playblast completed : {self._playblast_options["filename"]}')
 
-    def run(self, path=None, first_frame=None, last_frame=None):
-        if first_frame is not None and last_frame is not None:
-            self.set_frame_range(first_frame, last_frame)
-        elif first_frame is not None:
-            _, cur_last = self.get_frame_range()
-            self.set_frame_range(first_frame, cur_last)
-        elif last_frame is not None:
-            cur_first, _ = self.get_frame_range()
-            self.set_frame_range(cur_first, last_frame)
+    def run(self, path=None, frame_range=None):
+        """Execute the playblast with optional overrides.
+
+        Args:
+            path (str | None): Output path override.
+            frame_range (tuple[int, int] | None): (first, last) override.
+        """
+        if frame_range:
+            self.set_frame_range(frame_range[0], frame_range[1])
+
         if path:
             self._playblast_options['filename'] = path
 
         user_camera = self.get_persp_camera()
 
         self.pre_process()
-
         self.playblast()
-
         self.post_process()
 
         self.set_persp_camera(user_camera)
