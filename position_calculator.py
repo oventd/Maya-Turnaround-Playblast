@@ -31,7 +31,7 @@ def _get_fov(cam_node):
     v_fov = cmds.camera(cam_shape, q=True, vfv=True)
     return h_fov, v_fov
 
-def get_turnaround_camera_pos(camera_name="camera1", asset_grp="asset"):
+def get_turnaround_camera_pos(camera_name="camera1", target="asset", padding=1.3):
     """Compute (tx, ty, tz) on +Z to frame the "asset" node with padding.
 
     Args:
@@ -41,8 +41,8 @@ def get_turnaround_camera_pos(camera_name="camera1", asset_grp="asset"):
         tuple[float, float, float] | None: Camera position (tx, ty, tz), or
         None if the asset node is missing.
     """
-    if not cmds.objExists(asset_grp):
-        cmds.warning("Asset node not found: {}".format(asset_grp))
+    if not cmds.objExists(target):
+        cmds.warning("Asset node not found: {}".format(target))
         return None
 
     if not cmds.objExists(camera_name):
@@ -51,7 +51,7 @@ def get_turnaround_camera_pos(camera_name="camera1", asset_grp="asset"):
 
     # Find the asset node.
     sel = om.MSelectionList()
-    sel.add(asset_grp)
+    sel.add(target)
     asset_dag = sel.getDagPath(0)
 
     # Asset world-space bounding box.
@@ -76,9 +76,6 @@ def get_turnaround_camera_pos(camera_name="camera1", asset_grp="asset"):
 
     # Use the larger to satisfy both.
     distance = max(d_h, d_v)
-
-    # Small padding to avoid tight framing.
-    padding = 1.10
 
     tz = distance * padding
     ty = bb.center.y

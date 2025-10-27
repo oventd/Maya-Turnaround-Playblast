@@ -11,6 +11,7 @@ class PlayblastGenerator:
             'endTime': 0,
             "format": "qt",
             "filename": "",
+            "forceOverwrite": True,
             "sequenceTime": False,
             "clearCache": True,
             "viewer": False,  # Prevent auto playback
@@ -47,14 +48,43 @@ class PlayblastGenerator:
     def resolution(self, width, height):
         self._playblast_options['widthHeight'] = (width, height)
 
-    @property
-    def frame_range(self):
+    # Template-style API for frame range
+    def get_frame_range(self):
         return self._playblast_options['startTime'], self._playblast_options['endTime']
 
-    @frame_range.setter
-    def frame_range(self, first_frame, last_frame):
+    def set_frame_range(self, first_frame, last_frame):
+        first_frame, last_frame = self._coerce_frame_range(first_frame, last_frame)
         self._playblast_options['startTime'] = first_frame
         self._playblast_options['endTime'] = last_frame
+        self._on_frame_range_changed(first_frame, last_frame)
+
+    # Property maintained for convenience/backwards-compat
+    @property
+    def frame_range(self):
+        return self.get_frame_range()
+
+    @frame_range.setter
+    def frame_range(self, value):
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return
+        self.set_frame_range(value[0], value[1])
+
+    # Hooks for subclasses (Template Method pattern)
+    def _on_frame_range_changed(self, first_frame, last_frame):
+        """Hook: called after the base updates its frame range options."""
+        pass
+
+    def _coerce_frame_range(self, first_frame, last_frame):
+        """Hook: validate/adjust incoming frame range if needed."""
+        try:
+            f = int(first_frame)
+            l = int(last_frame)
+        except Exception:
+            # Leave as-is if conversion fails
+            return first_frame, last_frame
+        if l < f:
+            f, l = l, f
+        return f, l
 
     def get_persp_camera(self):
         """Return the camera currently used by the persp panel."""
@@ -97,10 +127,14 @@ class PlayblastGenerator:
         print(f'playblast completed : {self._playblast_options["filename"]}')
 
     def run(self, path=None, first_frame=None, last_frame=None):
-        if first_frame:
-            self._playblast_options['startTime'] = first_frame
-        if last_frame:
-            self._playblast_options['endTime'] = last_frame
+        if first_frame is not None and last_frame is not None:
+            self.set_frame_range(first_frame, last_frame)
+        elif first_frame is not None:
+            _, cur_last = self.get_frame_range()
+            self.set_frame_range(first_frame, cur_last)
+        elif last_frame is not None:
+            cur_first, _ = self.get_frame_range()
+            self.set_frame_range(cur_first, last_frame)
         if path:
             self._playblast_options['filename'] = path
 
@@ -113,4 +147,3 @@ class PlayblastGenerator:
         self.post_process()
 
         self.set_persp_camera(user_camera)
-

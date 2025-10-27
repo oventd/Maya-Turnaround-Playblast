@@ -1,69 +1,55 @@
 import maya.cmds as cmds
-import sys
 from playblast_generator import PlayblastGenerator
-from position_calculator import get_turnaround_camera_pos
+from camera_creator import TurnAroundCameraCreator
 
 
 class TurnAroundPlayblastGenerator(PlayblastGenerator):
     """Create a turnaround camera and generate a playblast with it."""
 
-    def __init__(self):
+    def __init__(self, target, padding=1.3, camera_name="publishcamera", group_name="publishcamera_group"):
         super().__init__()
-        self.camera = "publishcamera"  # Turnaround camera name
-        self.camera_group = "publishcamera_group"  # Turnaround camera group name
-        self.user_camera_name = ""  # User's current persp camera name
-
+        if not isinstance(target, str) or not cmds.objExists(target):
+            cmds.warning("Target node not found: {}".format(target))
+            return
+        self._target = target
+        self._padding = padding
         # Default frame range: 1 ~ 120
         self._playblast_options['startTime'] = 1
         self._playblast_options['endTime'] = 119
 
-    def create_camera(self):
-        """Create the turnaround camera and its group, then keyframe spin."""
-        self.delete_camera()
+        # Encapsulated camera creator (composition)
+        self._camera_creator = TurnAroundCameraCreator(camera_name, group_name)
+    @property
+    def target(self):
+        return self._target
 
-        # Create camera
-        self.camera = cmds.camera(n=self.camera)[0]
-
-        # Position camera based on asset size
-        cam_pos = get_turnaround_camera_pos(self.camera)
-        cmds.setAttr(f"{self.camera}.translateX", cam_pos[0])
-        cmds.setAttr(f"{self.camera}.translateY", cam_pos[1])
-        cmds.setAttr(f"{self.camera}.translateZ", cam_pos[2])
-
-        # Create group for the camera
-        cmds.select(clear=True)
-        self.camera_group = cmds.group(name=self.camera_group, empty=True)
-        cmds.parent(self.camera, self.camera_group)
-
-        # Animate rotateY for a full 360 spin
-        start_frame = self._playblast_options['startTime']
-        end_frame = self._playblast_options['endTime']
-        cmds.setKeyframe(self.camera_group, attribute="rotateY", value=0, time=start_frame)
-        cmds.setKeyframe(self.camera_group, attribute="rotateY", value=360, time=end_frame + 1)
-        cmds.selectKey(self.camera_group, time=(1, 120), attribute="rotateY")
-        cmds.keyTangent(inTangentType="linear", outTangentType="linear")
-
-    def delete_camera(self):
-        """Delete the created turnaround camera and group if they exist."""
-        if cmds.objExists(self.camera):
-            cmds.delete(self.camera)
-        if cmds.objExists(self.camera_group):
-            cmds.delete(self.camera_group)
+    @target.setter
+    def target(self, name):
+        if not isinstance(name, str) or not name:
+            return
+        self._target = name
 
     def pre_process(self):
         """Prepare scene: create camera and set it to the persp view."""
-
-        # Create the turnaround camera and assign to persp view
-        self.create_camera()
-        self.set_persp_camera(self.camera)
+        start_frame = self._playblast_options['startTime']
+        end_frame = self._playblast_options['endTime']
+        self._camera_creator.create(
+            target=self._target,
+            start_frame=start_frame,
+            end_frame=end_frame,
+            padding=self._padding
+        )
+        target_cam = self._camera_creator.camera
+        self.set_persp_camera(target_cam)
         return
 
     def post_process(self):
         """Cleanup after playblast by removing the temporary camera."""
-        # Delete the turnaround camera
-        self.delete_camera()
+        self._camera_creator.delete()
 
 
 if __name__ == "__main__":
     import sys
-
+    sys.path.append("..")
+    target = "asset"
+    TurnAroundPlayblastGenerator(target).run()
