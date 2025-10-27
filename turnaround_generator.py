@@ -47,7 +47,9 @@ class TurnAroundPlayblastGenerator(PlayblastGenerator):
         """Cleanup after playblast by removing the temporary camera."""
         self._camera_creator.delete()
 
-
+    def _on_frame_range_changed(self, first_frame, last_frame):
+        self._camera_creator.update_frame_range(first_frame, last_frame)
+    
 if __name__ == "__main__":
     import sys
     sys.path.append("..")
