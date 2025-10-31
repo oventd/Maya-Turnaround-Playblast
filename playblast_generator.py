@@ -32,6 +32,14 @@ class PlayblastGenerator:
             "offScreen": True  # Use offscreen viewport
         }
         self._camera = None
+    @property
+    def format(self):
+        return self._playblast_options['format']
+    
+    @format.setter
+    def format(self, format):
+        format = format.lower()
+        self._playblast_options['format'] = format
 
     @property
     def path(self):
