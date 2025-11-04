@@ -1,9 +1,9 @@
 import maya.cmds as cmds
-from position_calculator import get_turnaround_camera_pos
+from position_calculator import get_TurnTable_camera_pos
 
 
-class TurnAroundCameraCreator:
-    """Encapsulates creation/deletion and setup of a turnaround camera.
+class TurnTableCameraCreator:
+    """Encapsulates creation/deletion and setup of a TurnTable camera.
 
     Responsibilities:
     - Create a camera transform and a parent group
@@ -12,10 +12,16 @@ class TurnAroundCameraCreator:
     - Delete created nodes for cleanup
     """
 
-    def __init__(self, camera_name="publishcamera", group_name="publishcamera_group"):
+    def __init__(self, 
+                 camera_name="publishcamera",
+                 group_name="publishcamera_group",
+                 target=None,
+                 padding=1.3):
         # Unified identifiers: hold current or intended names
         self._camera = camera_name
         self._group = group_name
+        self._target = None
+        self._padding = 1.3
 
     # Unified camera identifier (string). Setter renames existing node if needed.
     @property
@@ -54,24 +60,51 @@ class TurnAroundCameraCreator:
         else:
             self._group = name
 
-    def create(self, target, start_frame=1, end_frame=119, padding=1.3):
-        """Create and set up the turnaround camera and group."""
+    @property
+    def target(self):
+        return self._target
+
+    @target.setter
+    def target(self, name):
+        self._set_target(name)
+
+    def _set_target(self, target):
+        if target is not None:
+            if not isinstance(target, str) or not cmds.objExists(target):
+                cmds.warning("Target node not found: {}".format(target))
+                return
+            self._target = target
+
+    def create(self, target=None, start_frame=1, end_frame=119, padding=1.3):
+        """Create and set up the TurnTable camera and group."""
+        
+        self._padding = padding        
         end_animation = end_frame + 1
 
         # Clean up any existing nodes with the same names
         self.delete()
 
         # Create camera
+        self.create_camera(target)
+
+        # Create group
+        self.create_group()
+
+    def create_camera(self, target=None):
+        if target is None:
+            self._set_target(target)
+        
+        # Create camera
         self._camera = cmds.camera(n=self._camera)[0]
 
         # Position camera based on asset size
-        cam_pos = get_turnaround_camera_pos(self._camera, target, padding=1.3)
+        cam_pos = get_TurnTable_camera_pos(self._camera, self.target, padding=1.3)
         if cam_pos is not None:
             cmds.setAttr(f"{self._camera}.translateX", cam_pos[0])
             cmds.setAttr(f"{self._camera}.translateY", cam_pos[1])
             cmds.setAttr(f"{self._camera}.translateZ", cam_pos[2])
 
-        # Create group and parent camera under it
+    def create_group(self):
         cmds.select(clear=True)
         self._group = cmds.group(name=self._group, empty=True)
         cmds.parent(self._camera, self._group)
@@ -82,7 +115,7 @@ class TurnAroundCameraCreator:
         cmds.keyTangent(self._group, itt='linear', ott='linear', t=(1, end_animation))
 
     def delete(self):
-        """Delete the created turnaround camera and group if they exist."""
+        """Delete the created TurnTable camera and group if they exist."""
         if self._camera and cmds.objExists(self._camera):
             try:
                 cmds.delete(self._camera)
@@ -96,7 +129,7 @@ class TurnAroundCameraCreator:
         # Keep last known names as intended identifiers
 
     def update_frame_range(self, start_frame, end_frame):
-        """Update the turnaround rotation keys for the group if it exists."""
+        """Update the TurnTable rotation keys for the group if it exists."""
         end_animation = end_frame + 1
         if not self._group or not cmds.objExists(self._group):
             return

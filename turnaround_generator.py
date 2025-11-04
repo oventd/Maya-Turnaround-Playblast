@@ -1,10 +1,10 @@
 import maya.cmds as cmds
 from playblast_generator import PlayblastGenerator
-from camera_creator import TurnAroundCameraCreator
+from camera_creator import TurnTableCameraCreator
 
 
-class TurnAroundPlayblastGenerator(PlayblastGenerator):
-    """Create a turnaround camera and generate a playblast with it."""
+class TurnTablePlayblastGenerator(PlayblastGenerator):
+    """Create a TurnTable camera and generate a playblast with it."""
 
     def __init__(self, target, padding=1.3, camera_name="publishcamera", group_name="publishcamera_group"):
         super().__init__()
@@ -18,7 +18,7 @@ class TurnAroundPlayblastGenerator(PlayblastGenerator):
         self._playblast_options['endTime'] = 119
 
         # Encapsulated camera creator (composition)
-        self._camera_creator = TurnAroundCameraCreator(camera_name, group_name)
+        self._camera_creator = TurnTableCameraCreator(camera_name, group_name)
     @property
     def target(self):
         return self._target
@@ -54,4 +54,4 @@ if __name__ == "__main__":
     import sys
     sys.path.append("..")
     target = "asset"
-    TurnAroundPlayblastGenerator(target).run()
+    TurnTablePlayblastGenerator(target).run()

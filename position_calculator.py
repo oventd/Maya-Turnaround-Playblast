@@ -1,8 +1,8 @@
-"""Turnaround camera helpers for Maya.
+"""TurnTable camera helpers for Maya.
 
 Given a camera and an "asset" node, compute a (tx, ty, tz) on +Z that frames
 the asset with a small padding, using the camera's horizontal/vertical FOV.
-Public API: get_turnaround_camera_pos(camera_name).
+Public API: get_TurnTable_camera_pos(camera_name).
 """
 
 import math
@@ -31,7 +31,7 @@ def _get_fov(cam_node):
     v_fov = cmds.camera(cam_shape, q=True, vfv=True)
     return h_fov, v_fov
 
-def get_turnaround_camera_pos(camera_name="camera1", target="asset", padding=1.3):
+def get_TurnTable_camera_pos(camera_name="camera1", target="asset", padding=1.3):
     """Compute (tx, ty, tz) on +Z to frame the "asset" node with padding.
 
     Args:
@@ -62,7 +62,7 @@ def get_turnaround_camera_pos(camera_name="camera1", target="asset", padding=1.3
     half_h = bb.height * 0.5
     half_d = bb.depth * 0.5
 
-    # Horizontal radius in XZ (turnaround silhouette).
+    # Horizontal radius in XZ (TurnTable silhouette).
     r_h = math.hypot(half_w, half_d)
 
     # FOV in radians (clamped to avoid zero).

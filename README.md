@@ -1,6 +1,6 @@
-# Maya Turnaround Playblast
+# Maya TurnTable Playblast
 
-Simple generator to create a turnaround camera around an asset and generate a playblast in Maya.
+Simple generator to create a TurnTable camera around an asset and generate a playblast in Maya.
 
 ## Demo
 
@@ -19,12 +19,12 @@ During development, I used the view frustum visualization to debug and validate 
 
 ## Features
 
-- Turnaround camera creation with automated framing based on asset bounds
+- TurnTable camera creation with automated framing based on asset bounds
 
 ## File Overview
 
 - `playblast_generator.py`: Base class that wraps `cmds.playblast`, options, and template hooks for frame range.
-- `turnaround_generator.py`: Concrete generator that composes a camera creator and hooks frame changes to update keys.
+- `TurnTable_generator.py`: Concrete generator that composes a camera creator and hooks frame changes to update keys.
 - `camera_creator.py`: Creates/positions a camera + group and lays down a 360° rotateY spin and manages cleanup.
 - `position_calculator.py`: Computes camera position from camera FOV and target asset bounding box.
 - `view_frustum_crv_generator.py`: Utility to draw camera frustum curves for visualization.
