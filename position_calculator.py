@@ -41,6 +41,10 @@ def get_TurnTable_camera_pos(camera_name="camera1", target="asset", padding=1.3)
         tuple[float, float, float] | None: Camera position (tx, ty, tz), or
         None if the asset node is missing.
     """
+    if not target or (isinstance(target, str) and not target.strip()):
+        cmds.warning("No target provided; skip framing.")
+        return None
+
     if not cmds.objExists(target):
         cmds.warning("Asset node not found: {}".format(target))
         return None
