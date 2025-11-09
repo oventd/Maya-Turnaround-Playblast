@@ -90,10 +90,11 @@ class TurnTableCameraCreator:
         # Create group
         self.create_group()
 
-    def create_camera(self, target=None):
-        if target is None:
-            self._set_target(target)
-        
+        # Animate group
+        self.animate_group(start_frame, end_animation)
+
+    def create_camera(self, target):
+        self._set_target(target)
         # Create camera
         self._camera = cmds.camera(n=self._camera)[0]
 
@@ -109,10 +110,11 @@ class TurnTableCameraCreator:
         self._group = cmds.group(name=self._group, empty=True)
         cmds.parent(self._camera, self._group)
 
+    def animate_group(self, start_frame, end_animation):
         # Animate rotateY for a full 360 spin
         cmds.setKeyframe(self._group, attribute="rotateY", value=0, time=start_frame)
         cmds.setKeyframe(self._group, attribute="rotateY", value=360, time=end_animation)
-        cmds.keyTangent(self._group, itt='linear', ott='linear', t=(1, end_animation))
+        cmds.keyTangent(self._group, itt='linear', ott='linear', t=(1, ))
 
     def delete(self):
         """Delete the created TurnTable camera and group if they exist."""
