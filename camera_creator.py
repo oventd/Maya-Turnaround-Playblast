@@ -16,14 +16,17 @@ class TurnTableCameraCreator:
                  camera_name="publishcamera",
                  group_name="publishcamera_group",
                  target=None,
-                 padding=1.3):
+                 padding=1.3,
+                 frame_range=(1, 119)):
         # Unified identifiers: hold current or intended names
         self._camera = camera_name
         self._group = group_name
-        self._target = None
-        self._padding = 1.3
-
-    # Unified camera identifier (string). Setter renames existing node if needed.
+        self._padding = padding
+        self._frame_range = frame_range
+        
+        if target is not None:
+            self._set_target(target)
+     
     @property
     def camera(self):
         return self._camera
@@ -42,7 +45,6 @@ class TurnTableCameraCreator:
         else:
             self._camera = name
 
-    # Unified group identifier (string). Setter renames existing node if needed.
     @property
     def group(self):
         return self._group
@@ -75,23 +77,22 @@ class TurnTableCameraCreator:
                 return
             self._target = target
 
-    def create(self, target=None, start_frame=1, end_frame=119, padding=1.3):
+    def create(self):
         """Create and set up the TurnTable camera and group."""
         
-        self._padding = padding        
-        end_animation = end_frame + 1
-
         # Clean up any existing nodes with the same names
         self.delete()
 
         # Create camera
-        self.create_camera(target)
+        self.create_camera(self.target)
 
         # Create group
         self.create_group()
 
         # Animate group
-        self.animate_group(start_frame, end_animation)
+        self.animate_group()
+
+        return self.camera
 
     def create_camera(self, target):
         self._set_target(target)
@@ -110,7 +111,10 @@ class TurnTableCameraCreator:
         self._group = cmds.group(name=self._group, empty=True)
         cmds.parent(self._camera, self._group)
 
-    def animate_group(self, start_frame, end_animation):
+    def animate_group(self):
+        start_frame = self._frame_range[0]
+        end_animation = self._frame_range[1]
+
         # Animate rotateY for a full 360 spin
         cmds.setKeyframe(self._group, attribute="rotateY", value=0, time=start_frame)
         cmds.setKeyframe(self._group, attribute="rotateY", value=360, time=end_animation)

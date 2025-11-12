@@ -13,12 +13,14 @@ class TurnTablePlayblastGenerator(PlayblastGenerator):
             return
         self._target = target
         self._padding = padding
+        self._camera = camera_name
+        self._group = group_name
         # Default frame range: 1 ~ 120
         self._playblast_options['startTime'] = 1
         self._playblast_options['endTime'] = 119
 
         # Encapsulated camera creator (composition)
-        self._camera_creator = TurnTableCameraCreator(camera_name, group_name)
+        self._camera_creator = None
     @property
     def target(self):
         return self._target
@@ -33,13 +35,15 @@ class TurnTablePlayblastGenerator(PlayblastGenerator):
         """Prepare scene: create camera and set it to the persp view."""
         start_frame = self._playblast_options['startTime']
         end_frame = self._playblast_options['endTime']
-        self._camera_creator.create(
-            target=self._target,
-            start_frame=start_frame,
-            end_frame=end_frame,
-            padding=self._padding
-        )
-        self._camera = self._camera_creator.camera
+
+        # Encapsulated camera creator (composition)
+        self._camera_creator = TurnTableCameraCreator(camera_name=self._camera,
+                                                      group_name=self._group,
+                                                      target=self._target,
+                                                      padding=self._padding,
+                                                      frame_range=(start_frame, end_frame))
+
+        self._camera = self._camera_creator.create()
         super().pre_process()
         return
 
