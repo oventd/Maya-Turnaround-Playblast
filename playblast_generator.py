@@ -1,6 +1,6 @@
 import maya.cmds as cmds
 import maya.mel as mel
-
+from pathlib import Path
 
 class PlayblastGenerator:
     """Helper to generate Maya playblasts with configurable options.
@@ -8,30 +8,31 @@ class PlayblastGenerator:
     Usage:
     - Set options via properties or `options` dict.
     - Optionally override template hooks in subclasses:
-      - `_coerce_frame_range(first, last)` to validate/adjust input range
+      - `_validate_frame_range(first, last)` to validate/adjust input range
       - `_on_frame_range_changed(first, last)` to react to range changes
     - Call `run(path=..., frame_range=(first, last))`.
     """
 
     def __init__(self):
         self._playblast_options = {
-            'startTime': 0,
-            'endTime': 0,
-            "format": "qt",
+            "clearCache": True,
+            "compression": "png",
+            "endTime": 0,
             "filename": "",
             "forceOverwrite": True,
-            "sequenceTime": False,
-            "clearCache": True,
-            "viewer": False,  # Prevent auto playback
-            "showOrnaments": False,  # Hide UI ornaments
             "framePadding": 4,
+            "format": "qt",
+            "offScreen": True,  # Use offscreen viewport
             "percent": 100,  # Render scale percent
-            "compression": "png",
             "quality": 100,
+            "sequenceTime": False,
+            "showOrnaments": False,  # Hide UI ornaments
+            "startTime": 0,
+            "viewer": False,  # Prevent auto playback
             "widthHeight": (1280, 720),  # Output resolution
-            "offScreen": True  # Use offscreen viewport
         }
         self._camera = None
+        
     @property
     def format(self):
         return self._playblast_options['format']
@@ -39,16 +40,22 @@ class PlayblastGenerator:
     @format.setter
     def format(self, format):
         format = format.lower()
-        self._playblast_options['format'] = format
+        self._playblast_options["format"] = format
+        if format == "image":
+            self._playblast_options["compression"] = "jpg"
+
+    @property    
+    def compression(self):
+        return self._playblast_options['compression']
+    
+    @compression.setter
+    def compression(self, compression):
+        self._playblast_options['compression'] = compression
 
     @property
     def path(self):
         """Output filepath for the playblast."""
         return self._playblast_options['filename']
-    
-    def _set_path(self, path):
-        """Setter kept for compatibility; sets `filename` in options."""
-        self._playblast_options['filename'] = path
 
     @path.setter
     def path(self, path):
@@ -63,7 +70,7 @@ class PlayblastGenerator:
     @options.setter
     def options(self, options):
         """Replace the options dict entirely (write)."""
-        self._playblast_options = options
+        self._playblast_options = options.copy()
 
     @property
     def resolution(self):
@@ -71,8 +78,9 @@ class PlayblastGenerator:
         return self._playblast_options['widthHeight']
 
     @resolution.setter
-    def resolution(self, width, height):
+    def resolution(self, value):
         """Set output resolution as (width, height)."""
+        width, height = value
         self._playblast_options['widthHeight'] = (width, height)
 
     @property
@@ -83,13 +91,6 @@ class PlayblastGenerator:
     def camera(self, camera):
         self._camera = camera
 
-    def _set_frame_range(self, first_frame, last_frame):
-        """Set frame range, then trigger subclass hook for side-effects."""
-        first_frame, last_frame = self._coerce_frame_range(first_frame, last_frame)
-        self._playblast_options['startTime'] = first_frame
-        self._playblast_options['endTime'] = last_frame
-        self._on_frame_range_changed(first_frame, last_frame)
-
     @property
     def frame_range(self):
         """Get or set (first_frame, last_frame)."""
@@ -99,17 +100,39 @@ class PlayblastGenerator:
     def frame_range(self, value):
         if not isinstance(value, (list, tuple)) or len(value) != 2:
             return
-        self._set_frame_range(value[0], value[1])
+        self._set_frame_range(value)
+    
+    def _set_path(self, path):
+        """Setter kept for compatibility; sets `filename` in options."""
+        path = Path(path)
+        suffix = path.suffix.lower()
+        if suffix == ".png":
+            self._playblast_options["format"] = "image"
+            self._playblast_options["compression"] = "png"
+        else:
+            self._playblast_options["format"] = "qt"
 
-    def _on_frame_range_changed(self, first_frame, last_frame):
+        clean_name = str(path.with_suffix("")) if suffix else str(path)
+        self._playblast_options["filename"] = clean_name
+
+    def _set_frame_range(self, frame_range):
+        """Set frame range, then trigger subclass hook for side-effects."""
+        first_frame, last_frame = self._validate_frame_range(frame_range)
+        first_frame, last_frame = int(first_frame), int(last_frame)
+        self._playblast_options['startTime'] = first_frame
+        self._playblast_options['endTime'] = last_frame
+        self._on_frame_range_changed(frame_range)
+
+    def _on_frame_range_changed(self, frame_range):
         """Hook: after range updates; subclasses sync dependent state here."""
         pass
 
-    def _coerce_frame_range(self, first_frame, last_frame):
+    def _validate_frame_range(self, frame_range):
         """Hook: validate/adjust incoming frame range if needed.
 
         Default behavior casts to int and swaps if last < first.
         """
+        first_frame, last_frame = frame_range
         try:
             f = int(first_frame)
             l = int(last_frame)
@@ -174,7 +197,7 @@ class PlayblastGenerator:
         if path:
             self._set_path(path)
         if frame_range:
-            self._set_frame_range(frame_range[0], frame_range[1])
+            self._set_frame_range(frame_range)
 
         user_camera = self.get_persp_camera()
 
