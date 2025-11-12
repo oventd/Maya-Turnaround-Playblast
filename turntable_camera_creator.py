@@ -22,6 +22,13 @@ class TurnTableCameraCreator(AnimCameraCreator):
         self._target = target
         self._padding = padding
         self._frame_range = frame_range
+    @property
+    def frame_range(self):
+        return self._frame_range
+
+    @frame_range.setter
+    def frame_range(self, value):
+        self._frame_range = value
 
     def create_camera(self):
         super().create_camera()
